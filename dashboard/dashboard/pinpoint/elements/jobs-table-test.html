@@ -14,13 +14,12 @@ found in the LICENSE file.
 'use strict';
 
 tr.b.unittest.testSuite(function() {
-
   var testOptions = {};
 
   test('instantiate', function() {
     var table = document.createElement('jobs-table');
     table.jobsList = [{
-      'jobid': 12345,
+      'job_id': 12345,
       'configuration': 'configuration',
       'test_suite': 'test_suite',
       'test': 'test',

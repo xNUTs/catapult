@@ -22,38 +22,19 @@ tr.exportTo('tr.v.d', function() {
       this.legacyTIRLabel_ = '';
       this.storyDisplayName_ = '';
       this.storyGroupingKeys_ = new Map();
-      this.storyRepeatCounter_ = undefined;
       this.storyUrl_ = '';
       this.storysetRepeatCounter_ = undefined;
+      this.canonicalUrl_ = '';
 
       if (opt_info) {
         this.addInfo(opt_info);
       }
     }
 
-    canAddDiagnostic(otherDiagnostic, name, parentHist, otherParentHist) {
-      return otherDiagnostic instanceof tr.v.d.MergedTelemetryInfo ||
-             otherDiagnostic instanceof TelemetryInfo;
-    }
-
-    /**
-     * If subclasses override canAddDiagnostic() then they must also override
-     * this method to return a replacement Diagnostic.
-     * Subclasses can modify return |this| or create and return a new
-     * Diagnostic, but must not modify |otherDiagnostic|.
-     *
-     * @param {!(tr.v.d.TelemetryInfo|tr.v.d.MergedTelemetryInfo}}
-     *         otherDiagnostic
-     * @param {!string} name
-     * @param {!tr.v.Histogram} parentHist
-     * @param {!tr.v.Histogram} otherParentHist
-     * @return {!tr.v.d.MergedTelemetryInfo}
-     */
-    addDiagnostic(otherDiagnostic, name, parentHist, otherParentHist) {
-      var merged = new tr.v.d.MergedTelemetryInfo();
-      merged.addDiagnostic(this);
-      merged.addDiagnostic(otherDiagnostic);
-      return merged;
+    clone() {
+      let clone = new tr.v.d.MergedTelemetryInfo();
+      clone.addDiagnostic(this);
+      return clone;
     }
 
     /**
@@ -63,7 +44,6 @@ tr.exportTo('tr.v.d', function() {
      * @param {undefined|!Object} info.storyGroupingKeys
      * @param {undefined|string} info.storyDisplayName
      * @param {undefined|string} info.storyUrl
-     * @param {undefined|number} info.storyRepeatCounter
      * @param {number} info.storysetRepeatCounter
      * @param {number} info.benchmarkStartMs Milliseconds since Unix epoch.
      */
@@ -82,9 +62,6 @@ tr.exportTo('tr.v.d', function() {
       }
       tr.b.iterItems(info.storyGroupingKeys || {}, (name, value) =>
         this.storyGroupingKeys_.set(name, value));
-      if (info.storyRepeatCounter !== undefined) {
-        this.storyRepeatCounter_ = info.storyRepeatCounter;
-      }
       if (info.storyUrl) {
         this.storyUrl_ = info.storyUrl;
       }
@@ -93,6 +70,9 @@ tr.exportTo('tr.v.d', function() {
       }
       if (info.legacyTIRLabel) {
         this.legacyTIRLabel_ = info.legacyTIRLabel;
+      }
+      if (info.canonicalUrl) {
+        this.canonicalUrl_ = info.canonicalUrl;
       }
     }
 
@@ -118,18 +98,18 @@ tr.exportTo('tr.v.d', function() {
       d.storyDisplayName = this.storyDisplayName;
       if (this.storyGroupingKeys.size > 0) {
         d.storyGroupingKeys = {};
-        for (var [name, value] of this.storyGroupingKeys) {
+        for (let [name, value] of this.storyGroupingKeys) {
           d.storyGroupingKeys[name] = value;
         }
       }
-      d.storyRepeatCounter = this.storyRepeatCounter;
       d.storyUrl = this.storyUrl;
       d.storysetRepeatCounter = this.storysetRepeatCounter;
       d.legacyTIRLabel = this.legacyTIRLabel;
+      d.canonicalUrl = this.canonicalUrl;
     }
 
     static fromDict(d) {
-      var info = new TelemetryInfo();
+      let info = new TelemetryInfo();
       info.addInfo(d);
       return info;
     }
@@ -167,20 +147,16 @@ tr.exportTo('tr.v.d', function() {
       return this.storyUrl_;
     }
 
-    get storyRepeatCounter() {
-      return this.storyRepeatCounter_;
-    }
-
-    get storyRepeatCounterLabel() {
-      return 'story repeat ' + this.storyRepeatCounter;
-    }
-
     get storysetRepeatCounter() {
       return this.storysetRepeatCounter_;
     }
 
     get storysetRepeatCounterLabel() {
       return 'storyset repeat ' + this.storysetRepeatCounter;
+    }
+
+    get canonicalUrl() {
+      return this.canonicalUrl_;
     }
 
     get benchmarkStart() {
@@ -199,7 +175,7 @@ tr.exportTo('tr.v.d', function() {
      * @return {*}
      */
     static getField(hist, fieldName, defaultValue) {
-      var telemetry = tr.v.d.TelemetryInfo.getFromHistogram(hist);
+      let telemetry = tr.v.d.TelemetryInfo.getFromHistogram(hist);
       if (!(telemetry instanceof tr.v.d.TelemetryInfo) ||
           !telemetry[fieldName]) {
         return defaultValue;
@@ -213,7 +189,7 @@ tr.exportTo('tr.v.d', function() {
      * @return {string}
      */
     static getStoryGroupingKeyLabel(hist, storyGroupingKey) {
-      var telemetry = tr.v.d.TelemetryInfo.getFromHistogram(hist);
+      let telemetry = tr.v.d.TelemetryInfo.getFromHistogram(hist);
       if (!(telemetry instanceof tr.v.d.TelemetryInfo)) {
         return storyGroupingKey + ': undefined';
       }

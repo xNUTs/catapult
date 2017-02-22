@@ -25,6 +25,16 @@ tr.exportTo('tr.v.d', function() {
       this.webrtc_ = info.webrtc || [];
     }
 
+    addToHistogram(hist) {
+      hist.diagnostics.set(RevisionInfo.NAME, this);
+    }
+
+    clone() {
+      let clone = new tr.v.d.MergedRevisionInfo();
+      clone.addDiagnostic(this);
+      return clone;
+    }
+
     asDictInto_(d) {
       d.chromiumCommitPosition = this.chromiumCommitPosition;
       d.v8CommitPosition = this.v8CommitPosition;
@@ -72,6 +82,8 @@ tr.exportTo('tr.v.d', function() {
       return this.webrtc_;
     }
   }
+
+  RevisionInfo.NAME = 'revisions';
 
   tr.v.d.Diagnostic.register(RevisionInfo, {
     elementName: 'tr-v-ui-revision-info-span'

@@ -16,28 +16,71 @@ tr.exportTo('tr.v.d', function() {
     constructor() {
       super();
       this.benchmarkNames_ = new Set();
-      this.benchmarkStarts_ = new Set();
+      this.benchmarkStartsMs_ = new Set();
       this.labels_ = new Set();
       this.legacyTIRLabels_ = new Set();
       this.storyDisplayNames_ = new Set();
       this.storyGroupingKeys_ = new Map();
-      this.storyRepeatCounters_ = new Set();
       this.storyUrls_ = new Set();
       this.storysetRepeatCounters_ = new Set();
     }
 
-    canAddDiagnostic(otherDiagnostic, name, parentHist, otherParentHist) {
+    clone() {
+      let clone = new tr.v.d.MergedTelemetryInfo();
+      clone.addDiagnostic(this);
+      return clone;
+    }
+
+    addToHistogram(hist) {
+      hist.diagnostics.set(tr.v.d.TelemetryInfo.NAME, this);
+    }
+
+    equals(other) {
+      if (!(other instanceof MergedTelemetryInfo)) return false;
+      if (!tr.b.setsEqual(this.benchmarkNames, other.benchmarkNames)) {
+        return false;
+      }
+      if (!tr.b.setsEqual(this.labels, other.labels)) return false;
+      if (!tr.b.setsEqual(this.storyDisplayNames, other.storyDisplayNames)) {
+        return false;
+      }
+      if (!tr.b.setsEqual(this.legacyTIRLabels, other.legacyTIRLabels)) {
+        return false;
+      }
+      if (!tr.b.setsEqual(this.storysetRepeatCounters,
+          other.storysetRepeatCounters)) {
+        return false;
+      }
+      if (!tr.b.setsEqual(this.storyUrls, other.storyUrls)) return false;
+      if (!tr.b.setsEqual(this.benchmarkStartsMs, other.benchmarkStartsMs)) {
+        return false;
+      }
+
+      if (!tr.b.setsEqual(new Set(this.storyGroupingKeys.keys()),
+          new Set(other.storyGroupingKeys.keys()))) {
+        return false;
+      }
+      for (let [k, vs] of this.storyGroupingKeys) {
+        if (!tr.b.setsEqual(vs, other.storyGroupingKeys.get(k))) {
+          return false;
+        }
+      }
+
+      return true;
+    }
+
+    canAddDiagnostic(otherDiagnostic) {
       return otherDiagnostic instanceof MergedTelemetryInfo ||
              otherDiagnostic instanceof tr.v.d.TelemetryInfo;
     }
 
-    addDiagnostic(otherDiagnostic, name, parentHist, otherParentHist) {
+    addDiagnostic(otherDiagnostic) {
       if (otherDiagnostic instanceof MergedTelemetryInfo) {
         for (let name of otherDiagnostic.benchmarkNames) {
           this.benchmarkNames.add(name);
         }
-        for (let t of otherDiagnostic.benchmarkStarts) {
-          this.benchmarkStarts.add(t);
+        for (let t of otherDiagnostic.benchmarkStartsMs) {
+          this.benchmarkStartsMs.add(t);
         }
         for (let name of otherDiagnostic.labels) {
           this.labels.add(name);
@@ -51,9 +94,6 @@ tr.exportTo('tr.v.d', function() {
         for (let name of otherDiagnostic.storyUrls) {
           this.storyUrls.add(name);
         }
-        for (let name of otherDiagnostic.storyRepeatCounters) {
-          this.storyRepeatCounters.add(name);
-        }
         for (let name of otherDiagnostic.storysetRepeatCounters) {
           this.storysetRepeatCounters.add(name);
         }
@@ -66,14 +106,20 @@ tr.exportTo('tr.v.d', function() {
             this.storyGroupingKeys.set(name, new Set(value));
           }
         }
-        return this;
+        return;
       }
 
       if (otherDiagnostic.benchmarkName) {
         this.benchmarkNames.add(otherDiagnostic.benchmarkName);
       }
       if (otherDiagnostic.benchmarkStart !== undefined) {
-        this.benchmarkStarts.add(otherDiagnostic.benchmarkStart);
+        // Store the number timestamps in the Set, not the Date objects.
+        // Sets uniquify based on object identity, not equivalency.
+        // Multiple different Date objects can have the same value, and we don't
+        // want to store multiple Dates with the same value.
+        // Dates are not interned like strings are.
+        // The |benchmarkStarts| getter converts the timestamps to Date objects.
+        this.benchmarkStartsMs.add(otherDiagnostic.benchmarkStart.getTime());
       }
       if (otherDiagnostic.label) {
         this.labels.add(otherDiagnostic.label);
@@ -91,27 +137,20 @@ tr.exportTo('tr.v.d', function() {
           this.storyGroupingKeys.set(name, new Set([value]));
         }
       }
-      if (otherDiagnostic.storyRepeatCounter !== undefined) {
-        this.storyRepeatCounters.add(otherDiagnostic.storyRepeatCounter);
-      }
       if (otherDiagnostic.storyUrl) {
         this.storyUrls.add(otherDiagnostic.storyUrl);
       }
       if (otherDiagnostic.storysetRepeatCounter !== undefined) {
         this.storysetRepeatCounters.add(otherDiagnostic.storysetRepeatCounter);
       }
-      return this;
     }
 
     asDictInto_(d) {
       if (this.benchmarkNames.size) {
         d.benchmarkNames = Array.from(this.benchmarkNames);
       }
-      if (this.benchmarkStarts.size) {
-        d.benchmarkStartsMs = [];
-        for (let t of this.benchmarkStarts) {
-          d.benchmarkStartsMs.push(t.getTime());
-        }
+      if (this.benchmarkStartsMs.size) {
+        d.benchmarkStartsMs = Array.from(this.benchmarkStartsMs);
       }
       if (this.labels.size) {
         d.labels = Array.from(this.labels);
@@ -128,9 +167,6 @@ tr.exportTo('tr.v.d', function() {
           d.storyGroupingKeys[name] = Array.from(values);
         }
       }
-      if (this.storyRepeatCounters.size) {
-        d.storyRepeatCounters = Array.from(this.storyRepeatCounters);
-      }
       if (this.storyUrls.size) {
         d.storyUrls = Array.from(this.storyUrls);
       }
@@ -145,12 +181,12 @@ tr.exportTo('tr.v.d', function() {
         info.benchmarkNames_.add(n);
       }
       for (let n of d.benchmarkStartsMs || []) {
-        info.benchmarkStarts_.add(new Date(n));
+        info.benchmarkStartsMs_.add(n);
       }
       for (let n of d.labels || []) {
         info.labels_.add(n);
       }
-      for (let n of d.legacyTIRLabels) {
+      for (let n of d.legacyTIRLabels || []) {
         info.legacyTIRLabels_.add(n);
       }
       for (let n of d.storyDisplayNames || []) {
@@ -158,9 +194,6 @@ tr.exportTo('tr.v.d', function() {
       }
       tr.b.iterItems(d.storyGroupingKeys || {}, (name, values) =>
         info.storyGroupingKeys_.set(name, new Set(values)));
-      for (let n of d.storyRepeatCounters || []) {
-        info.storyRepeatCounters_.add(n);
-      }
       for (let n of d.storyUrls || []) {
         info.storyUrls_.add(n);
       }
@@ -202,14 +235,6 @@ tr.exportTo('tr.v.d', function() {
       return this.storyUrls_;
     }
 
-    get storyRepeatCounters() {
-      return this.storyRepeatCounters_;
-    }
-
-    get storyRepeatCounterLabel() {
-      return 'story repeat ' + Array.from(this.storyRepeatCounters).join(',');
-    }
-
     get storysetRepeatCounters() {
       return this.storysetRepeatCounters_;
     }
@@ -219,16 +244,27 @@ tr.exportTo('tr.v.d', function() {
           this.storysetRepeatCounters).join(',');
     }
 
-    get benchmarkStarts() {
-      return this.benchmarkStarts_;
+    /**
+     * @return {!Set.<number>}
+     */
+    get benchmarkStartsMs() {
+      return this.benchmarkStartsMs_;
     }
 
+    /**
+     * @return {!Array.<!Date>}
+     */
+    get benchmarkStarts() {
+      let startsMs = Array.from(this.benchmarkStartsMs);
+      startsMs.sort((x, y) => x - y);
+      return startsMs.map(t => new Date(t));
+    }
+
+    /**
+     * @return {!Array.<string>}
+     */
     get benchmarkStartStrings() {
-      let strs = [];
-      for (let t of this.benchmarkStarts) {
-        strs.push(tr.b.formatDate(t));
-      }
-      return strs;
+      return this.benchmarkStarts.map(tr.b.formatDate);
     }
 
     /**
@@ -238,7 +274,7 @@ tr.exportTo('tr.v.d', function() {
      * @return {*}
      */
     static getField(hist, fieldName, defaultValue) {
-      let telemetry = tr.v.d.MergedTelemetryInfo.getFromValue(hist);
+      let telemetry = tr.v.d.TelemetryInfo.getFromHistogram(hist);
       if (!(telemetry instanceof tr.v.d.MergedTelemetryInfo) ||
           !telemetry[fieldName]) {
         return defaultValue;
@@ -252,7 +288,7 @@ tr.exportTo('tr.v.d', function() {
      * @return {string}
      */
     static getStoryGroupingKeyLabel(hist, storyGroupingKey) {
-      let telemetry = tr.v.d.MergedTelemetryInfo.getFromValue(hist);
+      let telemetry = tr.v.d.TelemetryInfo.getFromHistogram(hist);
       if (!(telemetry instanceof tr.v.d.MergedTelemetryInfo))
         return storyGroupingKey + ': undefined';
       return storyGroupingKey + ': ' +
@@ -270,15 +306,6 @@ tr.exportTo('tr.v.d', function() {
           v, storyGroupingKey);
     }
   }
-
-  // Diagnostics generally do not need a constant name or getFromValue().
-  // MergedTelemetryInfo is a special kind of Diagnostic that is produced by
-  // telemetry, which shepherds whole flocks of traces at once, and needs a
-  // system to identify and find traces by these attributes.
-
-  // Values produced by telemetry all have a single MergedTelemetryInfo at this
-  // key in their DiagnosticMap.
-  MergedTelemetryInfo.NAME = 'telemetry';
 
   tr.v.d.Diagnostic.register(MergedTelemetryInfo, {
     elementName: 'tr-v-ui-merged-telemetry-info-span'

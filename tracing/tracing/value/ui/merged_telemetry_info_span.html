@@ -9,6 +9,13 @@ found in the LICENSE file.
 
 <dom-module id="tr-v-ui-merged-telemetry-info-span">
   <template>
+    <style>
+    #hide, #table {
+      display: none;
+    }
+    </style>
+    <button id="show" on-click="onShow_">Show</button>
+    <button id="hide" on-click="onHide_">Hide</button>
     <tr-ui-b-table id="table"></tr-ui-b-table>
   </template>
 </dom-module>
@@ -17,21 +24,25 @@ found in the LICENSE file.
 Polymer({
   is: 'tr-v-ui-merged-telemetry-info-span',
 
-  ready: function() {
+  ready() {
     this.diagnostic_ = undefined;
     this.$.table.showHeader = false;
     this.$.table.tableColumns = [
-      {
-        value: function(row) {
-          return row[0];
-        },
-      },
-      {
-        value: function(row) {
-          return row[1];
-        }
-      }
+      {value: row => row[0]},
+      {value: row => row[1]},
     ];
+  },
+
+  onShow_() {
+    this.$.show.style.display = 'none';
+    this.$.hide.style.display = 'block';
+    this.$.table.style.display = 'table';
+  },
+
+  onHide_() {
+    this.$.show.style.display = 'block';
+    this.$.hide.style.display = 'none';
+    this.$.table.style.display = 'none';
   },
 
   get diagnostic() {
@@ -43,13 +54,13 @@ Polymer({
     this.updateContents_();
   },
 
-  updateContents_: function() {
+  updateContents_() {
     if (this.diagnostic === undefined) {
       this.$.table.tableRows = [];
       return;
     }
 
-    var rows = [];
+    let rows = [];
 
     if (this.diagnostic.benchmarkNames.size) {
       rows.push([
@@ -57,7 +68,7 @@ Polymer({
         Array.from(this.diagnostic.benchmarkNames).join(', ')
       ]);
     }
-    if (this.diagnostic.benchmarkStarts.size) {
+    if (this.diagnostic.benchmarkStarts.length) {
       rows.push([
         'benchmark starts',
         this.diagnostic.benchmarkStartStrings.join(', ')
@@ -67,24 +78,24 @@ Polymer({
       rows.push(['urls', Array.from(this.diagnostic.storyUrls).join(', ')]);
     }
     if (this.diagnostic.storyDisplayNames.size) {
-      rows.push(['stories', Array.from(
-          this.diagnostic.storyDisplayNames).join(', ')]);
+      rows.push([
+        'stories',
+        Array.from(this.diagnostic.storyDisplayNames).join(', ')
+      ]);
     }
     if (this.diagnostic.storysetRepeatCounters.size) {
-      rows.push(['storyset repeats', Array.from(
-          this.diagnostic.storysetRepeatCounters).join(', ')]);
-    }
-    if (this.diagnostic.storyRepeatCounters.size) {
-      rows.push(['story repeats', Array.from(
-          this.diagnostic.storyRepeatCounters).join(', ')]);
+      rows.push([
+        'storyset repeats',
+        Array.from(this.diagnostic.storysetRepeatCounters).join(', ')
+      ]);
     }
     if (this.diagnostic.labels.size) {
       rows.push(['label', Array.from(this.diagnostic.labels).join(', ')]);
     }
     if (this.diagnostic.storyGroupingKeys.size) {
-      var gov = document.createElement('tr-ui-a-generic-object-view');
-      var obj = {};
-      for (var [key, value] of this.diagnostic.storyGroupingKeys) {
+      let gov = document.createElement('tr-ui-a-generic-object-view');
+      let obj = {};
+      for (let [key, value] of this.diagnostic.storyGroupingKeys) {
         obj[key] = Array.from(value);
       }
       gov.object = obj;

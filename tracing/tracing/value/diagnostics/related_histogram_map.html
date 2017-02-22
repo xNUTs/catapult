@@ -19,6 +19,61 @@ tr.exportTo('tr.v.d', function() {
       this.histogramsByName_ = new Map();
     }
 
+    canAddDiagnostic(otherDiagnostic) {
+      return otherDiagnostic instanceof RelatedHistogramMap;
+    }
+
+    addDiagnostic(otherDiagnostic) {
+      // Related Histograms might not exist yet.
+    }
+
+    mergeRelationships(otherDiagnostic, parentHist, otherParentHist) {
+      /*
+        Modify |this| to contain Histograms that should be related to
+        |parentHist|.
+
+        |otherParentHist| was merged to |parentHist|.
+        |otherDiagnostic| contains Histograms that are related to
+        |otherParentHist|.
+
+        Since mergeRelationships() is called after all Histograms are merged,
+        then the MERGED_TO diagnostics of the Histograms in |otherDiagnostic|
+        contain Histograms that should be related to |parentHist| via |this|
+        RelatedHistogramMap.
+
+        otherParentHist -----------------------------> parentHist
+        |               merged to RelatedHistogramSet   |
+        |                                               |
+        | otherDiagnostic                               | this
+        | RelatedHistogramMap                           | RelatedHistogramMap
+        v                                               v
+        otherRelatedHist -----------------------------> relatedHist
+                         merged to RelatedHistogramSet
+
+        However, |otherRelatedHist| may have been merged to Histograms using
+        different grouping keys, so if |relatedHist|'s merge path is different
+        from |parentHist|'s merge path, then |relatedHist| should not be related
+        to |parentHist|.
+       */
+
+      let parentGroupingPath = tr.v.d.GroupingPath.getFromHistogram(parentHist);
+
+      for (let [name, otherRelatedHist] of otherDiagnostic) {
+        let mergedTo = otherRelatedHist.diagnostics.get(
+            tr.v.d.MERGED_TO_DIAGNOSTIC_KEY);
+        if (mergedTo === undefined) continue;
+
+        for (let relatedHist of mergedTo) {
+          let relatedGroupingPath = tr.v.d.GroupingPath.getFromHistogram(
+              relatedHist);
+          if (relatedGroupingPath === undefined) continue;
+          if (!parentGroupingPath.equals(relatedGroupingPath)) continue;
+
+          this.set(name, relatedHist);
+        }
+      }
+    }
+
     /**
      * Lookup a Histogram by name. Returns undefined if |name| is not found.
      *
@@ -59,7 +114,7 @@ tr.exportTo('tr.v.d', function() {
     }
 
     * [Symbol.iterator]() {
-      for (var pair of this.histogramsByName_)
+      for (let pair of this.histogramsByName_)
         yield pair;
     }
 
@@ -75,10 +130,10 @@ tr.exportTo('tr.v.d', function() {
      * @param {boolean=} opt_required
      */
     resolve(histograms, opt_required) {
-      for (var [name, hist] of this) {
+      for (let [name, hist] of this) {
         if (!(hist instanceof tr.v.d.HistogramRef)) continue;
 
-        var guid = hist.guid;
+        let guid = hist.guid;
         hist = histograms.lookupHistogram(guid);
         if (hist instanceof tr.v.Histogram) {
           this.histogramsByName_.set(name, hist);
@@ -90,13 +145,13 @@ tr.exportTo('tr.v.d', function() {
 
     asDictInto_(d) {
       d.values = {};
-      for (var [name, hist] of this) {
+      for (let [name, hist] of this) {
         d.values[name] = hist.guid;
       }
     }
 
     static fromDict(d) {
-      var map = new RelatedHistogramMap();
+      let map = new RelatedHistogramMap();
       tr.b.iterItems(d.values, function(name, guid) {
         map.set(name, new tr.v.d.HistogramRef(guid));
       });

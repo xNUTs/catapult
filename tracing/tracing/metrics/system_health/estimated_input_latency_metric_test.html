@@ -13,7 +13,6 @@ found in the LICENSE file.
 'use strict';
 
 tr.b.unittest.testSuite(function() {
-
   function addInteractiveTimestamp(rendererProcess, mainThread, timestamp) {
     mainThread.sliceGroup.pushSlice(tr.c.TestUtils.newSliceEx({
       cat: 'blink.user_timing',
@@ -37,7 +36,7 @@ tr.b.unittest.testSuite(function() {
     }));
   }
 
-  test('estimatedInputLatency', function() {
+  test('expectedQueueingTime', function() {
     let model = tr.c.TestUtils.newModel((model) => {
       let rendererProcess = model.getOrCreateProcess(1984);
       let mainThread = rendererProcess.getOrCreateThread(2);
@@ -63,13 +62,16 @@ tr.b.unittest.testSuite(function() {
       }));
     });
     let values = new tr.v.HistogramSet();
-    tr.metrics.sh.estimatedInputLatency(values, model);
-    let eqt = values.getHistogramNamed(
+    tr.metrics.sh.expectedQueueingTimeMetric(values, model);
+    let interactiveEQT = values.getHistogramNamed(
         'interactive:500ms_window:renderer_eqt');
-    assert.equal(0.1, eqt.average);
+    assert.equal(0.1, interactiveEQT.average);
+    let totalEQT = values.getHistogramNamed(
+        'total:500ms_window:renderer_eqt');
+    assert.equal(10, totalEQT.average);
   });
 
-  test('estimatedInputLatency_noInteractiveThrows', function() {
+  test('expectedQueueingTime_noInteractive', function() {
     let model = tr.c.TestUtils.newModel((model) => {
       let rendererProcess = model.getOrCreateProcess(1984);
       let mainThread = rendererProcess.getOrCreateThread(2);
@@ -94,12 +96,13 @@ tr.b.unittest.testSuite(function() {
       }));
     });
     let values = new tr.v.HistogramSet();
-    assert.throws(() => {
-      tr.metrics.sh.estimatedInputLatency(values, model);
-    }, 'getOnlyElement was passed an empty iterable.');
+    tr.metrics.sh.expectedQueueingTimeMetric(values, model);
+    let interactiveEQT = values.getHistogramNamed(
+        'interactive:500ms_window:renderer_eqt');
+    assert.equal(0, interactiveEQT.numValues);
   });
 
-  test('estimatedInputLatency_multipleInteractiveThrows', function() {
+  test('expectedQueueingTime_multipleInteractive', function() {
     let model = tr.c.TestUtils.newModel((model) => {
       let rendererProcess = model.getOrCreateProcess(1984);
       let mainThread = rendererProcess.getOrCreateThread(2);
@@ -126,12 +129,15 @@ tr.b.unittest.testSuite(function() {
       }));
     });
     let values = new tr.v.HistogramSet();
-    assert.throws(() => {
-      tr.metrics.sh.estimatedInputLatency(values, model);
-    }, 'getOnlyElement was passed an iterable with multiple elements.');
+    tr.metrics.sh.expectedQueueingTimeMetric(values, model);
+    let interactiveEQT = values.getHistogramNamed(
+        'interactive:500ms_window:renderer_eqt');
+    // TODO(ulan): Support multiple interactive time windows when
+    // https://crbug.com/692112 is fixed.
+    assert.equal(0, interactiveEQT.numValues);
   });
 
-  test('estimatedInputLatency_multipleRenderersAggregates', function() {
+  test('expectedQueueingTime_multipleRenderersAggregates', function() {
     let model = tr.c.TestUtils.newModel(function(model) {
       let rendererProcess = model.getOrCreateProcess(1984);
       let mainThread = rendererProcess.getOrCreateThread(2);
@@ -167,10 +173,66 @@ tr.b.unittest.testSuite(function() {
       }));
     });
     let values = new tr.v.HistogramSet();
-    tr.metrics.sh.estimatedInputLatency(values, model);
+    tr.metrics.sh.expectedQueueingTimeMetric(values, model);
     let eqt = values.getHistogramNamed(
         'interactive:500ms_window:renderer_eqt');
     assert.equal(0.05, eqt.average);
+  });
+
+  test('contributionToExpectedQueueingTime', function() {
+    let model = tr.c.TestUtils.newModel((model) => {
+      let rendererProcess = model.getOrCreateProcess(1984);
+      let mainThread = rendererProcess.getOrCreateThread(2);
+      mainThread.name = 'CrRendererMain';
+      addInteractiveTimestamp(rendererProcess, mainThread, 200);
+      mainThread.sliceGroup.pushSlice(tr.c.TestUtils.newSliceEx({
+        cat: 'toplevel',
+        title: 'TaskQueueManager::ProcessTaskFromWorkQueue',
+        start: 0,
+        duration: 100,
+      }));
+      mainThread.sliceGroup.pushSlice(tr.c.TestUtils.newSliceEx({
+        cat: 'v8',
+        title: 'V8.GCFinalizeMC',
+        start: 50,
+        duration: 50,
+      }));
+      mainThread.sliceGroup.pushSlice(tr.c.TestUtils.newSliceEx({
+        cat: 'toplevel',
+        title: 'TaskQueueManager::ProcessTaskFromWorkQueue',
+        start: 3000,
+        duration: 10,
+      }));
+      mainThread.sliceGroup.pushSlice(tr.c.TestUtils.newSliceEx({
+        cat: 'v8',
+        title: 'V8.GCFinalizeMC',
+        start: 3000,
+        duration: 5,
+      }));
+      mainThread.sliceGroup.pushSlice(tr.c.TestUtils.newSliceEx({
+        cat: 'toplevel',
+        title: 'TaskQueueManager::ProcessTaskFromWorkQueue',
+        start: 9000,
+        duration: 10,
+      }));
+      mainThread.sliceGroup.pushSlice(tr.c.TestUtils.newSliceEx({
+        cat: 'v8',
+        title: 'V8.GCFinalizeMC',
+        start: 9000,
+        duration: 5,
+      }));
+      mainThread.sliceGroup.createSubSlices();
+    });
+    let values = new tr.v.HistogramSet();
+    tr.metrics.sh.contributionToExpectedQueueingTime(
+        (event => event.title === 'V8.GCFinalizeMC'), 'v8:gc',
+        values, model);
+    let interactiveEQT = values.getHistogramNamed(
+        'interactive:500ms_window:renderer_eqt:v8:gc');
+    assert.equal(0.025, interactiveEQT.average);
+    let totalEQT = values.getHistogramNamed(
+        'total:500ms_window:renderer_eqt:v8:gc');
+    assert.equal(2.5, totalEQT.average);
   });
 });
 </script>

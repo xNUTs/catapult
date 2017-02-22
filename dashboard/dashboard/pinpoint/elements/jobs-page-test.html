@@ -15,7 +15,6 @@ found in the LICENSE file.
 'use strict';
 
 tr.b.unittest.testSuite(function() {
-
   var testOptions = {
     tearDown: function() {
       testing_common.clearXhrMock();
@@ -26,7 +25,7 @@ tr.b.unittest.testSuite(function() {
     var mockResponse = {
       'job_list': [
         {
-          'jobid': 12345,
+          'job_id': 12345,
           'configuration': 'configuration',
           'test_suite': 'test_suite',
           'test': 'test',
@@ -43,6 +42,5 @@ tr.b.unittest.testSuite(function() {
     var page = document.createElement('jobs-page');
     this.addHTMLOutput(page);
   }, testOptions);
-
 });
 </script>

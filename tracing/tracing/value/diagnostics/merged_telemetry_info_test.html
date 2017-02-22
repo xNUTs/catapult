@@ -21,7 +21,6 @@ tr.b.unittest.testSuite(function() {
       label: 'label0',
       storyDisplayName: 'story0',
       storyGroupingKeys: {a: 'b', c: 'd'},
-      storyRepeatCounter: 0,
       storyUrl: 'http://0',
       storysetRepeatCounter: 0,
       legacyTIRLabel: 'tir0',
@@ -33,22 +32,28 @@ tr.b.unittest.testSuite(function() {
       label: 'label1',
       storyDisplayName: 'story1',
       storyGroupingKeys: {a: 'e', f: 'g'},
-      storyRepeatCounter: 1,
       storyUrl: 'http://1',
       storysetRepeatCounter: 1,
       legacyTIRLabel: 'tir1',
     });
 
     assert.isFalse(t0.canAddDiagnostic(new tr.v.d.Generic('')));
-    assert.isTrue(t0.canAddDiagnostic(t1));
+    assert.isFalse(t0.canAddDiagnostic(t1));
 
-    let m0 = t0.addDiagnostic(t1);
-
+    let m0 = t0.clone();
     assert.instanceOf(m0, tr.v.d.MergedTelemetryInfo);
     assert.isFalse(m0.canAddDiagnostic(new tr.v.d.Generic('')));
-    assert.isTrue(m0.canAddDiagnostic(t0));
     assert.isTrue(m0.canAddDiagnostic(t1));
 
+    m0.addDiagnostic(t1);
+
+    let m1 = t1.clone();
+    m1.addDiagnostic(t0);
+
+    assert.isTrue(m1.equals(m0));
+    assert.isTrue(m0.equals(m1));
+
+    // Test round-tripping.
     let clone = tr.v.d.Diagnostic.fromDict(m0.asDict());
 
     assert.deepEqual(Array.from(clone.benchmarkNames), ['bm0', 'bm1']);
@@ -63,8 +68,20 @@ tr.b.unittest.testSuite(function() {
     assert.deepEqual(Array.from(clone.storyGroupingKeys.get('f')), ['g']);
     assert.deepEqual(Array.from(clone.storyDisplayNames), ['story0', 'story1']);
     assert.deepEqual(Array.from(clone.storyUrls), ['http://0', 'http://1']);
-    assert.deepEqual(Array.from(clone.storyRepeatCounters), [0, 1]);
     assert.deepEqual(Array.from(clone.storysetRepeatCounters), [0, 1]);
+  });
+
+  test('mergeSameBenchmarkStarts', function() {
+    let t0 = new tr.v.d.TelemetryInfo({
+      benchmarkStartMs: 0,
+    });
+    let t1 = new tr.v.d.TelemetryInfo({
+      benchmarkStartMs: 0,
+    });
+    let merged = t0.clone();
+    merged.addDiagnostic(t1);
+    let startDate = tr.b.getOnlyElement(merged.benchmarkStarts);
+    assert.strictEqual(startDate.getTime(), 0);
   });
 });
 </script>

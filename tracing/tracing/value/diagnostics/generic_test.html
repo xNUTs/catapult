@@ -6,20 +6,25 @@ found in the LICENSE file.
 -->
 
 <link rel="import" href="/tracing/core/test_utils.html">
-<link rel="import" href="/tracing/value/diagnostics/generic.html">
+<link rel="import" href="/tracing/value/diagnostics/collected_generic.html">
 
 <script>
 'use strict';
 
 tr.b.unittest.testSuite(function() {
   test('merge', function() {
-    var a = new tr.v.d.Generic('a');
-    var b = new tr.v.d.Generic('b');
-    assert.isTrue(a.canAddDiagnostic(b));
-    assert.isTrue(b.canAddDiagnostic(a));
-    var ab = a.addDiagnostic(b);
+    let a = new tr.v.d.Generic('a');
+    let b = new tr.v.d.Generic('b');
+
+    assert.isFalse(a.canAddDiagnostic(b));
+    assert.isFalse(b.canAddDiagnostic(a));
+
+    let ab = a.clone();
+    ab.addDiagnostic(b);
     assert.deepEqual(ab.value, ['a', 'b']);
-    var bab = b.addDiagnostic(ab);
+
+    let bab = b.clone();
+    bab.addDiagnostic(ab);
     assert.deepEqual(bab.value, ['b', 'a', 'b']);
   });
 });
